@@ -6,28 +6,29 @@ app = Flask(__name__)
 @app.route('/')
 def hello_world():
     logic.i = logic.i + 1
-    return 'Τι θες ρε μαλακισμένο? Πάρε τον γαμιοαριθμό σου %d' % logic.i
+    print "---> Something happened"
+    return 'Τι θες ρε μαλακισμένο? Πάρε τον γαμιοαριθμό σου %d\n' % logic.i
 
-@app.route('/register/<ipp>/<int:port>/<username>')
-def registrate(ipp,port,username):
-	return ipp + ' ' + str(port) + ' ' + username
+@app.route('/register/<int:port>/<username>')
+def registrate(port,username):
+	return logic.register(request.remote_addr,port,username)
 
 @app.route('/list_groups/')
 def groups():
-	return "NA PARE TA GROUP SOY"
+	return logic.listgroups()
 
 @app.route('/list_members/<group>')
 def groupies(group):
-	return u'Για ποιο group θες? Για το %s? ΑΝΤΕ ΓΕΙΑ' % group
+	return logic.listmembers(group)
 
-@app.route('/join_group/<group>')
-def joinare(group):
-	return u'Μπράβο μαλάκα μου μπήκες στο %s' % group
+@app.route('/join_group/<group>/<username>')
+def joinare(group,username):
+	return logic.joingroup(group,username)
 
-@app.route('/exit_group/<group>')
-def feuga(group):
+@app.route('/exit_group/<group>/<username>')
+def feuga(group,username):
 	return u'Έλα ΠΑΡΕ ΠΟΥΛΟ ΑΠ\'ΤΟ %s' % group
 
-@app.route('/quit')
-def rage():
+@app.route('/quit/<int:id>')
+def rage(id):
 	return 'Καλό ψόφο. Μαλάκα. Με ip %s' % (request.remote_addr)
