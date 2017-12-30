@@ -5,9 +5,8 @@ app = Flask(__name__)
 
 @app.route('/')
 def hello_world():
-    logic.i = logic.i + 1
     print "---> Something happened"
-    return 'Τι θες ρε μαλακισμένο? Πάρε τον γαμιοαριθμό σου %d\n' % logic.i
+    return 'Τι θες ρε μαλακισμένο? Πάρε τον γαμιοαριθμό σου %d\n' % 5
 
 @app.route('/register/<int:port>/<username>')
 def registrate(port,username):
@@ -27,8 +26,8 @@ def joinare(group,username):
 
 @app.route('/exit_group/<group>/<username>')
 def feuga(group,username):
-	return u'Έλα ΠΑΡΕ ΠΟΥΛΟ ΑΠ\'ΤΟ %s' % group
+	return logic.exitgroup(group,username)
 
 @app.route('/quit/<int:id>')
 def rage(id):
-	return 'Καλό ψόφο. Μαλάκα. Με ip %s' % (request.remote_addr)
+	return logic.quitchat(id)
