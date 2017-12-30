@@ -6,7 +6,7 @@ app = Flask(__name__)
 @app.route('/')
 def hello_world():
     print "---> Something happened"
-    return 'Τι θες ρε μαλακισμένο? Πάρε τον γαμιοαριθμό σου %d\n' % 5
+    return u'Τι θες ρε μαλακισμένο? Πάρε την ip σου ' + request.remote_addr
 
 @app.route('/register/<int:port>/<username>')
 def registrate(port,username):
