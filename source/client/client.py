@@ -181,23 +181,36 @@ class CommandHandler:
     def initializeDict(cls):
         cls.commandDict = {
             "echo":cls.echo,
-            "newname":cls.newname
+            "newname":cls.newname,
+            "h":cls.help
         }
     
     # What happens when the user simply inputs text
     # - should default to sending to active room?
     @classmethod
     def chat(cls,param):
+        """I just chat lulz"""
         OutputHandler.print("( Warning: No Chat supported yet :( )")
 
     # Echoes a message, for testing purposes
     @classmethod
     def echo(cls,param):
+        """Echoes a message to the console"""
         OutputHandler.print(param)
+    
+    # Echoes a message, for testing purposes
+    @classmethod
+    def help(cls,param):
+        """Prints available commands"""
+        comms = "Commands available:"
+        for key in cls.commandDict:
+            comms+="\r\n\t!"+key+" --> "+cls.commandDict[key].__doc__
+        OutputHandler.print(comms)
     
     # Test method, adds user name to start of prompt
     @classmethod
     def newname(cls,param):
+        """Changes the name of the user appearing on the prompt"""
         with UIHandler.ui_mutex:
             InputHandler.prompt_msg = "["+param+"]"+InputHandler.default_prompt_msg
         OutputHandler.outputQueue.put("( Notification: Name changed! )")
