@@ -1,8 +1,11 @@
 import sys
+import os
 from string import printable
 from threading import Thread, Lock
 import time
 import queue
+import http.client
+import json
 
 class _Getch:
     """Gets a single character from standard input.  Does not echo to the
@@ -42,6 +45,13 @@ class _GetchWindows:
 
 getch = _Getch()
 
+def makerequest(full_address,parameters):
+    """Returns a proper object out of a request to the tracker"""
+    conn = http.client.HTTPConnection(full_address)
+    conn.request("GET", parameters)
+    r1 = conn.getresponse()
+    data1 = r1.read()
+    return json.loads(data1.decode("utf-8"))
 
 class UIHandler:
     """
@@ -99,8 +109,8 @@ class InputHandler:
     """
     input_mutex = Lock()
     current_input=""
-    prompt_msg = ":> "
-    default_prompt_msg = ":> "
+    default_prompt_msg = "[(Warning:Not connected!)]:> "
+    prompt_msg = default_prompt_msg
     output_pudding = "|| "
 
     @classmethod
@@ -108,6 +118,9 @@ class InputHandler:
         with UIHandler.ui_mutex:
         
             if ord(ch)==3:# ctrl+c
+                #try to make a cleanup before exiting
+                print("")
+                CommandHandler.quit("")
                 exit()
 
             elif ord(ch)==13:# enter
@@ -182,9 +195,48 @@ class CommandHandler:
         cls.commandDict = {
             "echo":cls.echo,
             "newname":cls.newname,
-            "h":cls.help
+            "h":cls.help,
+            "register":cls.register,
+            "q":cls.quit
         }
     
+    @classmethod
+    def register(cls,param):
+        """(username) Register to tracker with the appropriate input"""
+        # name = "horestarod2"
+        param = param.split(' ')
+        if len(param)!=1:
+            OutputHandler.print("( Warning: Wrong Arguments! )")
+            return
+        name = param[0]
+        response = makerequest(StateHolder.server_ip,"/register/{}/{}".format(str(StateHolder.udp_listen_port),name))
+        if "Error" not in response:
+            StateHolder.id = response["id"]
+            StateHolder.name = response["username"]
+            with UIHandler.ui_mutex:
+                InputHandler.prompt_msg = "[{}]:> ".format(StateHolder.name)
+            OutputHandler.print("Logged in: id = {}, name = {}".format(str(StateHolder.id),StateHolder.name))
+        else:
+            OutputHandler.print("Error:"+response["Error"])
+    
+    @classmethod
+    def quit(cls,param):
+        """() Quit from tracker and exit program"""
+        if StateHolder.id == -1:
+            OutputHandler.print("( Warning: You are not logged in! )")
+            return
+        response = makerequest(StateHolder.server_ip,"/quit/{}".format(str(StateHolder.id)))
+        if "Error" not in response:
+            with UIHandler.ui_mutex:
+                InputHandler.prompt_msg = InputHandler.default_prompt_msg
+                StateHolder.id = -1
+                StateHolder.name = None
+                StateHolder.rooms = {}
+                StateHolder.current_room = None
+            OutputHandler.print("( Warning: You have been logged out! )")
+        else:
+            OutputHandler.print("Error:"+response["Error"])
+
     # What happens when the user simply inputs text
     # - should default to sending to active room?
     @classmethod
@@ -195,13 +247,12 @@ class CommandHandler:
     # Echoes a message, for testing purposes
     @classmethod
     def echo(cls,param):
-        """Echoes a message to the console"""
+        """(message) Echoes a message to the console"""
         OutputHandler.print(param)
     
-    # Echoes a message, for testing purposes
     @classmethod
     def help(cls,param):
-        """Prints available commands"""
+        """() Prints available commands"""
         comms = "Commands available:"
         for key in cls.commandDict:
             comms+="\r\n\t!"+key+" --> "+cls.commandDict[key].__doc__
@@ -210,13 +261,29 @@ class CommandHandler:
     # Test method, adds user name to start of prompt
     @classmethod
     def newname(cls,param):
-        """Changes the name of the user appearing on the prompt"""
+        """(newname) Changes the name of the user appearing on the prompt"""
         with UIHandler.ui_mutex:
             InputHandler.prompt_msg = "["+param+"]"+InputHandler.default_prompt_msg
         OutputHandler.outputQueue.put("( Notification: Name changed! )")
 
-# Do all necessary actions before input loop starts
+class StateHolder:
+    """
+    The main element holding the state of the program.
+    Will also hold the room structures, which are to be defined,
+    and on which the chat exchange actions will operate
+    """
+    name=None
+    id=-1
+    rooms = {}
+    current_room = None
+    server_ip = None
+    udp_listen_port = None
+
 def initialize():
+    """Do all necessary actions before input loop starts"""
+
+    StateHolder.server_ip = '0.0.0.0:5000'
+    StateHolder.udp_listen_port = 500
     out_thr = Thread(target=OutputHandler.processOutput, name=None, args=(),daemon=True)
     out_thr.start()
     CommandHandler.initializeDict()
@@ -224,6 +291,8 @@ def initialize():
     comm_thr.start()
     print(InputHandler.prompt_msg,end="")
     sys.stdout.flush()
+
+
 
 if __name__ == "__main__":
     initialize()

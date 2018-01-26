@@ -12,11 +12,11 @@ def register(ip,port,username):
         print "What I got is:",ip,str(port),username
         return json.dumps(users[username])
     else:
-        return json.dumps("Error:username already exists")
+        return json.dumps({"Error":"username already exists"})
 
 def listmembers(group):
     if group not in groups:
-        return json.dumps("Error:group does not exist")
+        return json.dumps({"Error":"group does not exist"})
     result = []
     for username in groups[group]:
         result.append(users[username])
@@ -38,7 +38,7 @@ def quitchat(id):
             username = uname
             break
     if not found:
-        return json.dumps("Error:id does not exist")
+        return json.dumps({"Error":"id does not exist"})
     todel = []
     for group in groups:
         if username in groups[group]:
@@ -50,9 +50,9 @@ def quitchat(id):
 
 def exitgroup(group,username):
     if username not in users:
-        return json.dumps("Error: username does not exist")
+        return json.dumps({"Error":"username does not exist"})
     if group not in groups:
-        return json.dumps("Error: group does not exist")
+        return json.dumps({"Error":"group does not exist"})
     groups[group].remove(username)
     if len(groups[group]) == 0:
         del groups[group]
@@ -60,7 +60,7 @@ def exitgroup(group,username):
 
 def joingroup(group,username):
     if username not in users:
-        return json.dumps("Error:username does not exist")
+        return json.dumps({"Error":"username does not exist"})
     if group not in groups:
         groups[group] = []
     if username not in groups[group]:
