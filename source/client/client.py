@@ -1,5 +1,4 @@
 import sys
-import os
 from string import printable
 from threading import Thread, Lock
 import time
