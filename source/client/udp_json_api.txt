@@ -1,0 +1,2 @@
+{purpose}
+purposes:"new_out_msg","incoming_msg","send_old_msg"
