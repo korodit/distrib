@@ -405,6 +405,7 @@ class roomFIFO:
             self.port = member_dict["port"]
             self.last_received = None
             self.process_mode = "prq" # prq:priority queue, inq:inputqueue
+            self.exit = False
             Thread(target=self.process_queues, name=None, args=(),daemon=True).start()
         
         def process_queues(self):
@@ -438,8 +439,11 @@ class roomFIFO:
                     except queue.Empty:
                         self.process_mode = "inq"
                         continue
-                else:
+                else: # self.process_mode == "prq"
                     msg = self.msg_queue.get()
+                    if self.exit:
+                        shared_sign[0] = False
+                        return
                     if msg["purpose"]=="incoming_msg":
                         msg_id = msg["msg_id"]
                         msg_txt = msg["text"]
@@ -450,13 +454,14 @@ class roomFIFO:
                                 shared_sign = [False]
                             self.process_mode = "prq"
 
-
-                        
-
         def swell_balls(self,message,shared_sign): # send a message repeatedely until the parent thread signals off
             while shared_sign[0]:
                 UDPbroker.sendUDP(message)
                 time.sleep(0.1)
+        
+        def exit_member(self):
+            self.exit = True
+            self.msg_queue.put({"Dummy":True})
 
 
 
@@ -474,10 +479,21 @@ class roomFIFO:
         while not self.exit:
             response = server_request("/list_members/{}".format(self.room_name))
             with self.members_lock:
+                to_be_deleted = []
+                for member in self.members:
+                    if member not in response:
+                        to_be_deleted.append(member)
+                for member in to_be_deleted:
+                    self.members[member].exit_member()
+                    del self.members[member]
                 for member in response:
                     if member["username"] not in self.members:
                         self.members[member["username"]] = self.member_struct(self.room_name,member)
             time.sleep(0.3)
+        with self.members_lock:
+            for member in self.members:
+                self.members[member].exit_member()
+        
     
     def chat_msg(self,msg_txt):
         with self.my_messages_lock:
@@ -496,25 +512,7 @@ class roomFIFO:
 
     def handle_msg(self,msg):
         purp = msg["purpose"]
-        # del msg["purpose"]
-        if purp == "new_out_msg": # the only one not coming from udp
-            with self.my_messages_lock:
-                self.my_messages.append(msg["text"])
-                self.my_last_msg_id+=1
-                out_msg = {}
-                out_msg["purpose"] = "incoming_msg"
-                out_msg["text"] = self.my_messages[-1]
-                out_msg["username"] = StateHolder.name
-                out_msg["room_name"] = self.room_name
-                out_msg["msg_id"] = self.my_last_msg_id
-                out_msg = json.dumps(out_msg)
-                with self.members_lock:
-                    for member in self.members:
-                        UDPbroker.sendUDP((self.members[member].ip,self.members[member].port,out_msg))
-            # OutputHandler.print("In '{}':".format(self.room_name)+
-            #                                                 StateHolder.name + " says:: "
-            #                                                 +str(msg))
-        elif purp in ["incoming_msg","reply_curr_last"]:
+        if purp in ["incoming_msg","reply_curr_last"]:
             with self.members_lock:
                 if msg["username"] in self.members:
                     self.members[msg["username"]].msg_queue.put(msg)
