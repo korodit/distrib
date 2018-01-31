@@ -1,2 +1,3 @@
-{purpose}
-purposes:"new_out_msg","incoming_msg","send_old_msg"
+{purpose,text,username(identity of sender),room_name,msg_id}
+purposes:"new_out_msg","incoming_msg","send_old_msg",
+            "send_curr_last","reply_curr_last"
