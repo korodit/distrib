@@ -478,7 +478,22 @@ class roomFIFO:
                     if member["username"] not in self.members:
                         self.members[member["username"]] = self.member_struct(self.room_name,member)
             time.sleep(0.3)
-            
+    
+    def chat_msg(self,msg_txt):
+        with self.my_messages_lock:
+            self.my_messages.append(msg_txt)
+            self.my_last_msg_id+=1
+            out_msg = {}
+            out_msg["purpose"] = "incoming_msg"
+            out_msg["text"] = self.my_messages[-1]
+            out_msg["username"] = StateHolder.name
+            out_msg["room_name"] = self.room_name
+            out_msg["msg_id"] = self.my_last_msg_id
+            out_msg = json.dumps(out_msg)
+            with self.members_lock:
+                for member in self.members:
+                    UDPbroker.sendUDP((self.members[member].ip,self.members[member].port,out_msg))
+
     def handle_msg(self,msg):
         purp = msg["purpose"]
         # del msg["purpose"]
@@ -592,7 +607,7 @@ class StateHolder:
     def chat_message(cls,txt):
         with cls.rooms_lock:
             if cls.current_room is not None:
-                cls.rooms[cls.current_room].handle_msg({"purpose":"new_out_msg","text":txt})
+                cls.rooms[cls.current_room].chat_msg(txt)
 
     @classmethod
     def exit_all_rooms(cls):
