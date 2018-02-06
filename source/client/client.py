@@ -261,7 +261,7 @@ class CommandHandler:
     
     @classmethod
     def writetogroup(cls,param):
-        """(group_name) Exit a chat group"""
+        """(group_name) Specify group on which to chat"""
         if StateHolder.id == -1:
             OutputHandler.print("( Warning: You are not logged in! )")
             return
