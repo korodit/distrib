@@ -431,6 +431,7 @@ class roomFIFO:
                             self.last_received += 1
                             OutputHandler.print("'{}' in room '{}' says:: {}".format(self.name,self.room_name,txt))
                         elif id > self.last_received + 1:
+                            self.msg_pool.put((id,txt))
                             message = {"purpose":"send_old_msg","username":StateHolder.name,"room_name":self.room_name,"msg_id":(self.last_received + 1)}
                             message = (self.ip,self.port,json.dumps(message))
                             shared_sign = [True]
