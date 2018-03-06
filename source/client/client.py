@@ -6,6 +6,8 @@ import queue
 import http.client
 import json
 import socket
+from pqdict import pqdict
+import copy
 
 class _Getch:
     """Gets a single character from standard input.  Does not echo to the
@@ -482,7 +484,7 @@ class roomFIFO:
             with self.members_lock:
                 to_be_deleted = []
                 for member in self.members:
-                    if member not in response:
+                    if member not in map(lambda x:x["username"],response):
                         to_be_deleted.append(member)
                 for member in to_be_deleted:
                     self.members[member].exit_member()
@@ -546,6 +548,199 @@ class roomFIFO:
     def kill_room(self):
         self.exit = True
 
+class roomTotal:
+
+    class member_struct:
+        def __init__(self,member_dict):
+            self.name = member_dict["username"]
+            self.ip = member_dict["ip"]
+            self.id = member_dict["id"]
+            self.port = member_dict["port"]
+            self.vote = None
+            self.confirmed = False
+            # self.pending = {}
+
+    def __init__(self,room_name):
+        self.room_name = room_name
+        self.counter = 0
+        self.s = 0
+        self.my_messages_q = queue.Queue(0)
+        self.incoming_msg_q = queue.Queue(0)
+        self.pending_msg_pool = pqdict({})
+        self.pending_per_member = {}
+        self.pending_lock = Lock()
+        self.exit = False
+        self.members = {}
+        self.members_lock = Lock()
+        self.working_set = {}
+        self.working_set_lock = Lock()
+        Thread(target=self.member_updater, name=None, args=(),daemon=True).start()
+        Thread(target=self.chat_pusher, name=None, args=(),daemon=True).start()
+        Thread(target=self.process_incoming, name=None, args=(),daemon=True).start()
+
+    def handle_msg(self,msg):
+        self.incoming_msg_q.put(msg)
+
+    def process_incoming(self):
+        while not self.exit:
+
+            while True:
+                with self.pending_lock:
+                    try:
+                        top_itm = self.pending_msg_pool.top()
+                        if not self.pending_msg_pool[top_itm][1]:
+                            break
+                        self.pending_msg_pool.pop()
+                        txt = self.pending_per_member[top_itm[0]][top_itm[1]]
+                        del self.pending_per_member[top_itm[0]][top_itm[1]]
+                        OutputHandler.print("'{}' in room '{}' says:: {}".format(top_itm[0],self.room_name,txt))
+                    except KeyError:
+                        break
+
+            msg = self.incoming_msg_q.get()
+            if self.exit:break
+            purp = msg["purpose"]
+
+            # Pool elements:
+            # (sender username, msg id):(priority_num,deliverable,prop_id)
+
+            if purp == "ask_vote":
+                with self.members_lock:
+                    if msg["username"] not in self.members:
+                        continue
+                    with self.pending_lock:
+                        if ( msg["username"] , msg["msg_id"] ) not in self.pending_msg_pool:
+                            self.s += 1
+                            self.pending_msg_pool[( msg["username"] , msg["msg_id"] )] = (self.s,False,-1)
+                            self.pending_per_member[msg["username"]][msg["msg_id"]] = msg["text"]
+                        out_msg = {}
+                        out_msg["purpose"] = "vote"
+                        out_msg["username"] = StateHolder.name
+                        out_msg["room_name"] = self.room_name
+                        out_msg["msg_id"] = msg["msg_id"]
+                        out_msg["priority"]  = self.pending_msg_pool[(msg["username"] , msg["msg_id"])][0]
+                        out_msg["proposer_id"] = StateHolder.id        
+                        # out_msg = json.dumps(out_msg)
+                        UDPbroker.sendUDP((self.members[msg["username"]].ip,self.members[msg["username"]].port,json.dumps(out_msg)))          
+
+            elif purp == "vote":
+                with self.working_set_lock:
+                    if msg["username"] in self.working_set and msg["msg_id"] == self.counter:
+                        voter_username = msg["username"]
+                        # voter_msg_id = msg["msg_id"]
+                        voter_priority = msg["priority"]
+                        voter_id = msg["proposer_id"]
+                        self.working_set[voter_username].vote = (voter_priority,voter_id)
+
+            elif purp == "final_sending":
+                with self.members_lock:
+                    if msg["username"] not in self.members:
+                        continue
+                    with self.pending_lock:
+                        if (msg["username"],msg["msg_id"]) in self.pending_msg_pool:
+                            self.pending_msg_pool[(msg["username"],msg["msg_id"])] = (msg["priority"],True,msg["proposer_id"])
+                        out_msg = {}
+                        out_msg["purpose"] = "final_received_confirm"
+                        out_msg["username"] = StateHolder.name
+                        out_msg["room_name"] = self.room_name
+                        out_msg["msg_id"] = msg["msg_id"]      
+                        # out_msg = json.dumps(out_msg)
+                        UDPbroker.sendUDP((self.members[msg["username"]].ip,self.members[msg["username"]].port,json.dumps(out_msg)))  
+                            
+            elif purp == "final_received_confirm":
+                with self.working_set_lock:
+                    if msg["username"] in self.working_set and msg["msg_id"] == self.counter:
+                        voter_username = msg["username"]
+                        self.working_set[voter_username].confirmed = True
+
+    def chat_pusher(self):
+        while not self.exit:
+            my_msg = self.my_messages_q.get()
+            self.counter+=1
+            with self.members_lock:
+                with self.working_set_lock:
+                    self.working_set = copy.deepcopy(self.members)
+            # The operation for a new chat message starts!
+            # phase 1
+            found = 1
+            while (not self.exit) and found > 0:
+                with self.working_set_lock:
+                    found = 0
+                    for member in self.working_set:
+                        if not self.working_set[member].vote:
+                            found+=1
+                            out_msg = {}
+                            out_msg["purpose"] = "ask_vote"
+                            out_msg["text"] = my_msg
+                            out_msg["username"] = StateHolder.name
+                            out_msg["room_name"] = self.room_name
+                            out_msg["msg_id"] = self.counter
+                            UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
+                time.sleep(0.1)
+            max_priority = -1
+            min_id = -1
+
+            with self.working_set_lock:
+                for member in self.working_set:
+                    if (self.working_set[member].vote[0]>max_priority) or ((self.working_set[member].vote[0]==max_priority) and (self.working_set[member].vote[1]<min_id)):
+                        min_priority,min_id = self.working_set[member].vote
+            found = 1
+            while (not self.exit) and found > 0:
+                with self.working_set_lock:
+                    found = 0
+                    for member in self.working_set:
+                        if not self.working_set[member].confirmed:
+                            found+=1
+                            out_msg = {}
+                            out_msg["purpose"] = "final_sending"
+                            out_msg["username"] = StateHolder.name
+                            out_msg["room_name"] = self.room_name
+                            out_msg["msg_id"] = self.counter
+                            out_msg["priority"] = max_priority
+                            out_msg["proposer_id"] = min_id
+                            UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
+                time.sleep(0.1)
+            
+
+
+                    
+    
+    def chat_msg(self,msg_txt):
+        self.my_messages_q.put(msg_txt)
+
+    def member_updater(self): #daemon thread
+        while not self.exit:
+            response = server_request("/list_members/{}".format(self.room_name))
+            with self.members_lock:
+                to_be_deleted = []
+                for member in self.members:
+                    if member not in map(lambda x:x["username"],response):1
+                        to_be_deleted.append(member)
+                with self.working_set_lock:
+                    for member in to_be_deleted:
+                        # self.members[member].exit_member()
+                        if member in self.working_set:
+                            del self.working_set[member]
+                        del self.members[member]
+                with self.pending_lock:
+                    for member in to_be_deleted:
+                        if member in self.pending_per_member:
+                            for msg_id in self.pending_per_member[member]:
+                                del self.pending_msg_pool[(member,msg_id)]
+                            del self.pending_per_member[member]
+                    for member in response:
+                        if member["username"] not in self.members:
+                            self.members[member["username"]] = self.member_struct(member)
+                            self.pending_per_member[member["username"]]={}
+            time.sleep(0.3)
+
+
+
+    def kill_room(self):
+        self.exit = True
+        self.my_messages_q.put("dummy")
+        self.incoming_msg_q.put({})
+
 class StateHolder:
     """
     The main element holding the state of the program.
@@ -561,7 +756,8 @@ class StateHolder:
     udp_listen_port = None
     exitt = False
     rooms_lock = Lock()
-    room_type = roomFIFO
+    # room_type = roomFIFO
+    room_type = roomTotal
 
     @classmethod
     def get_info(cls):
