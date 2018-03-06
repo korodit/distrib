@@ -460,7 +460,7 @@ class roomFIFO:
         def swell_balls(self,message,shared_sign): # send a message repeatedely until the parent thread signals off
             while shared_sign[0]:
                 UDPbroker.sendUDP(message)
-                time.sleep(0.1)
+                time.sleep(0.01)
         
         def exit_member(self):
             self.exit = True
@@ -611,7 +611,7 @@ class roomTotal:
                     with self.pending_lock:
                         if ( msg["username"] , msg["msg_id"] ) not in self.pending_msg_pool:
                             self.s += 1
-                            self.pending_msg_pool[( msg["username"] , msg["msg_id"] )] = (self.s,False,-1)
+                            self.pending_msg_pool[( msg["username"] , msg["msg_id"] )] = (self.s,False,StateHolder.id)
                             self.pending_per_member[msg["username"]][msg["msg_id"]] = msg["text"]
                         out_msg = {}
                         out_msg["purpose"] = "vote"
@@ -638,6 +638,7 @@ class roomTotal:
                         continue
                     with self.pending_lock:
                         if (msg["username"],msg["msg_id"]) in self.pending_msg_pool:
+                            self.s = max(self.s,msg["priority"])
                             self.pending_msg_pool[(msg["username"],msg["msg_id"])] = (msg["priority"],True,msg["proposer_id"])
                         out_msg = {}
                         out_msg["purpose"] = "final_received_confirm"
@@ -676,7 +677,7 @@ class roomTotal:
                             out_msg["room_name"] = self.room_name
                             out_msg["msg_id"] = self.counter
                             UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
-                time.sleep(0.1)
+                time.sleep(0.01)
             max_priority = -1
             min_id = -1
 
@@ -699,7 +700,7 @@ class roomTotal:
                             out_msg["priority"] = max_priority
                             out_msg["proposer_id"] = min_id
                             UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
-                time.sleep(0.1)
+                time.sleep(0.01)
             
 
 
@@ -714,7 +715,7 @@ class roomTotal:
             with self.members_lock:
                 to_be_deleted = []
                 for member in self.members:
-                    if member not in map(lambda x:x["username"],response):1
+                    if member not in map(lambda x:x["username"],response):
                         to_be_deleted.append(member)
                 with self.working_set_lock:
                     for member in to_be_deleted:
