@@ -328,6 +328,7 @@ class CommandHandler:
             StateHolder.id = int(response["id"])
             StateHolder.name = response["username"]
             StateHolder.my_ip = response["ip"]
+            StateHolder.start_heartbeat()
             with UIHandler.ui_mutex:
                 InputHandler.prompt_msg = "[{}]:> ".format(StateHolder.name)
             OutputHandler.print("Logged in: id = {}, name = {}, ip = {}, port = {}".format(str(StateHolder.id),StateHolder.name,response["ip"],response["port"]))
@@ -347,6 +348,7 @@ class CommandHandler:
                 # quit() to finish. In such case, avoid the actions below,
                 # as they lead to deadlock
                 with UIHandler.ui_mutex:
+                    StateHolder.stop_heartbeat()
                     StateHolder.exit_all_rooms()
                     StateHolder.id = -1
                     StateHolder.name = None
@@ -681,10 +683,11 @@ class roomTotal:
             max_priority = -1
             min_id = -1
 
-            with self.working_set_lock:
-                for member in self.working_set:
-                    if (self.working_set[member].vote[0]>max_priority) or ((self.working_set[member].vote[0]==max_priority) and (self.working_set[member].vote[1]<min_id)):
-                        min_priority,min_id = self.working_set[member].vote
+            if not self.exit:
+                with self.working_set_lock:
+                    for member in self.working_set:
+                        if (self.working_set[member].vote[0]>max_priority) or ((self.working_set[member].vote[0]==max_priority) and (self.working_set[member].vote[1]<min_id)):
+                            min_priority,min_id = self.working_set[member].vote
             found = 1
             while (not self.exit) and found > 0:
                 with self.working_set_lock:
@@ -757,6 +760,7 @@ class StateHolder:
     udp_listen_port = None
     exitt = False
     rooms_lock = Lock()
+    heartbeat_flag = []
     # room_type = roomFIFO
     room_type = roomTotal
 
@@ -812,6 +816,24 @@ class StateHolder:
             rooms = list(cls.rooms)
         for room_name in rooms:
             cls.exit_room(room_name)
+
+    @classmethod
+    def start_heartbeat(cls):
+        cls.heartbeat_flag = [True]
+        Thread(target=cls.heartbeat, name=None, args=(cls.heartbeat_flag,),daemon=True).start()
+
+    @classmethod
+    def heartbeat(cls,flag):
+        # flag = flag_list[0]
+        # OutputHandler.print("This is my flag list"+str(flag_list))
+        while (flag[0]):
+            server_request("/heartbeat/{}".format(cls.id))
+            time.sleep(0.3)
+
+    @classmethod
+    def stop_heartbeat(cls):
+        cls.heartbeat_flag[0] = False
+        cls.heartbeat_flag = [False]
 
     @classmethod
     def flag_exit(cls):

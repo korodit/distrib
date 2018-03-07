@@ -28,6 +28,10 @@ def joinare(group,username):
 def feuga(group,username):
 	return logic.exitgroup(group,username)
 
+@app.route('/heartbeat/<int:id>')
+def alive(id):
+	return logic.heartbeat(id)
+
 @app.route('/quit/<int:id>')
 def rage(id):
 	return logic.quitchat(id)
