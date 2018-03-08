@@ -342,13 +342,13 @@ class CommandHandler:
             OutputHandler.print("( Warning: You are not logged in! )")
             return
         response = server_request("/quit/{}".format(str(StateHolder.id)))
+        StateHolder.stop_heartbeat()
         if "Error" not in response:
             if not StateHolder.exitt:
                 #If we are about to quit, InputHandler blocks while waiting for
                 # quit() to finish. In such case, avoid the actions below,
                 # as they lead to deadlock
                 with UIHandler.ui_mutex:
-                    StateHolder.stop_heartbeat()
                     StateHolder.exit_all_rooms()
                     StateHolder.id = -1
                     StateHolder.name = None
@@ -768,12 +768,13 @@ class StateHolder:
     def get_info(cls):
         """ Get a string with info about program state"""
         res = ""
-        res += "Name = {}, ID = {}, IP = {}, UDP Listen = {}, Current room = {}".format(
+        res += "Name = {}, ID = {}, My IP = {}, UDP Listen = {}, Current room = {},Server IP = {}".format(
                                                                 cls.name,
                                                                 "[Not Set]" if cls.id == -1 else cls.id,
                                                                 cls.my_ip,
                                                                 cls.udp_listen_port,
-                                                                cls.current_room)
+                                                                cls.current_room,
+                                                                cls.server_ip)
         res += "\n\r   Chat groups participating in: {}".format(str(list(cls.rooms)))
         return res
 
@@ -891,14 +892,49 @@ class UDPbroker:
 def initialize():
     """Do all necessary actions before input loop starts"""
 
-    StateHolder.server_ip = '0.0.0.0:5000'
-    StateHolder.udp_listen_port = 5001 if len(sys.argv) < 2 else int(sys.argv[1])
+    # udp,register,server,room
+    arg_dict = get_args()
+    if "udp" in arg_dict and arg_dict["udp"].isdigit():
+        StateHolder.udp_listen_port = int(arg_dict["udp"])
+    else:
+        StateHolder.udp_listen_port = 5001
+
+    if "server" in arg_dict:
+        StateHolder.server_ip = arg_dict["server"]
+    else:
+        StateHolder.server_ip = '0.0.0.0:5000'
+
+    if "mode" in arg_dict:
+        if arg_dict["mode"] == "total":
+            StateHolder.room_type = roomTotal
+        else: # arg_dict["mode"] == "fifo":
+            StateHolder.room_type = roomFIFO
+    else:
+        StateHolder.room_type = roomFIFO
+            
+
+    # StateHolder.server_ip = '0.0.0.0:5000'
+    # StateHolder.udp_listen_port = 5001 if len(sys.argv) < 2 else int(sys.argv[1])
     OutputHandler.initialize()
     CommandHandler.initialize()
     UDPbroker.initialize()
     print(">> Welcome to the chat client! Press `!h` for help.")
     print(InputHandler.prompt_msg,end="")
     sys.stdout.flush()
+
+    if "register" in arg_dict:
+        CommandHandler.pushCommand("!register {}".format(arg_dict["register"]))
+    if "room" in arg_dict:
+        CommandHandler.pushCommand("!j "+arg_dict["room"])
+    # time.sleep(1)
+    # CommandHandler.pushCommand("!register {}".format(arg_dict["register"]))
+
+def get_args():
+    arg_pairs = list(map(lambda x:x.split("="),[x for x in sys.argv[1:] if x.count("=") == 1]))
+    arg_dict = {}
+    for par in arg_pairs:
+        arg_dict[par[0]] = par[1]
+    return arg_dict
 
 if __name__ == "__main__":
     initialize()
