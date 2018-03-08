@@ -167,6 +167,10 @@ class OutputHandler:
         OutputHandler.outputQueue.put(out)
 
     @classmethod
+    def print_msg(cls,out,timee):
+        cls.print(out+" --Timestamp::"+str(timee))
+
+    @classmethod
     def initialize(cls):
         Thread(target=OutputHandler.processOutput, name=None, args=(),daemon=True).start()
 
@@ -430,12 +434,12 @@ class roomFIFO:
             while True:
                 if self.process_mode == "prq":
                     try:
-                        id,txt = self.msg_pool.get_nowait()
+                        id,txt,ts = self.msg_pool.get_nowait()
                         if id == self.last_received + 1:
                             self.last_received += 1
-                            OutputHandler.print("'{}' in room '{}' says:: {}".format(self.name,self.room_name,txt))
+                            OutputHandler.print_msg("'{}' in room '{}' says:: {}".format(self.name,self.room_name,txt),ts)
                         elif id > self.last_received + 1:
-                            self.msg_pool.put((id,txt))
+                            self.msg_pool.put((id,txt,ts))
                             message = {"purpose":"send_old_msg","username":StateHolder.name,"room_name":self.room_name,"msg_id":(self.last_received + 1)}
                             message = (self.ip,self.port,json.dumps(message))
                             shared_sign = [True]
@@ -452,7 +456,8 @@ class roomFIFO:
                     if msg["purpose"]=="incoming_msg":
                         msg_id = msg["msg_id"]
                         msg_txt = msg["text"]
-                        self.msg_pool.put((msg_id,msg_txt))
+                        msg_ts = msg["timestamp"]
+                        self.msg_pool.put((msg_id,msg_txt,msg_ts))
                         if msg_id == self.last_received+1:
                             if shared_sign[0] == True:
                                 shared_sign[0] = False
@@ -474,6 +479,7 @@ class roomFIFO:
         self.room_name = room_name
         self.my_last_msg_id = -1
         self.my_messages=[]
+        self.my_messages_timestamps = []
         self.my_messages_lock = Lock()
         self.exit = False
         self.members = {}
@@ -503,6 +509,7 @@ class roomFIFO:
     def chat_msg(self,msg_txt):
         with self.my_messages_lock:
             self.my_messages.append(msg_txt)
+            self.my_messages_timestamps.append(time.time())
             self.my_last_msg_id+=1
             out_msg = {}
             out_msg["purpose"] = "incoming_msg"
@@ -510,6 +517,7 @@ class roomFIFO:
             out_msg["username"] = StateHolder.name
             out_msg["room_name"] = self.room_name
             out_msg["msg_id"] = self.my_last_msg_id
+            out_msg["timestamp"] = self.my_messages_timestamps[-1]
             out_msg = json.dumps(out_msg)
             with self.members_lock:
                 for member in self.members:
@@ -543,6 +551,7 @@ class roomFIFO:
                         out_msg["username"] = StateHolder.name
                         out_msg["room_name"] = self.room_name
                         out_msg["msg_id"] = msg["msg_id"]
+                        out_msg["timestamp"] = self.my_messages_timestamps[msg["msg_id"]]
                         out_msg = json.dumps(out_msg)
                         UDPbroker.sendUDP((self.members[msg["username"]].ip,self.members[msg["username"]].port,out_msg))
 
@@ -593,16 +602,16 @@ class roomTotal:
                         if not self.pending_msg_pool[top_itm][1]:
                             break
                         self.pending_msg_pool.pop()
-                        txt = self.pending_per_member[top_itm[0]][top_itm[1]]
+                        txt,ts = self.pending_per_member[top_itm[0]][top_itm[1]]
                         del self.pending_per_member[top_itm[0]][top_itm[1]]
-                        OutputHandler.print("'{}' in room '{}' says:: {}".format(top_itm[0],self.room_name,txt))
+                        OutputHandler.print_msg("'{}' in room '{}' says:: {}".format(top_itm[0],self.room_name,txt),ts)
                     except KeyError:
                         break
 
             msg = self.incoming_msg_q.get()
             if self.exit:break
             purp = msg["purpose"]
-            # self.pending_per_member = {"orestarod":{1:"Some text 1",2:"Some text 2"} , "airmper":{1:"airmper text 1",2:"airmper text 2"}}
+            # self.pending_per_member = {"orestarod":{1:("Some text 1",timestamp),2:("Some text 2",timestamp)} , "airmper":{1:("airmper text 1",timestamp),2:("airmper text 2",timestamp)}}
             # Pool elements:
             # (sender username, msg id):(priority_num,deliverable,prop_id)
 
@@ -614,7 +623,7 @@ class roomTotal:
                         if ( msg["username"] , msg["msg_id"] ) not in self.pending_msg_pool:
                             self.s += 1
                             self.pending_msg_pool[( msg["username"] , msg["msg_id"] )] = (self.s,False,StateHolder.id)
-                            self.pending_per_member[msg["username"]][msg["msg_id"]] = msg["text"]
+                            self.pending_per_member[msg["username"]][msg["msg_id"]] = (msg["text"],msg["timestamp"])
                         out_msg = {}
                         out_msg["purpose"] = "vote"
                         out_msg["username"] = StateHolder.name
@@ -666,18 +675,20 @@ class roomTotal:
             # The operation for a new chat message starts!
             # phase 1
             found = 1
+            timestamp = time.time()
             while (not self.exit) and found > 0:
                 with self.working_set_lock:
                     found = 0
+                    out_msg = {}
+                    out_msg["purpose"] = "ask_vote"
+                    out_msg["text"] = my_msg
+                    out_msg["username"] = StateHolder.name
+                    out_msg["room_name"] = self.room_name
+                    out_msg["msg_id"] = self.counter
+                    out_msg["timestamp"] = timestamp
                     for member in self.working_set:
                         if not self.working_set[member].vote:
                             found+=1
-                            out_msg = {}
-                            out_msg["purpose"] = "ask_vote"
-                            out_msg["text"] = my_msg
-                            out_msg["username"] = StateHolder.name
-                            out_msg["room_name"] = self.room_name
-                            out_msg["msg_id"] = self.counter
                             UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
                 time.sleep(0.01)
             max_priority = -1

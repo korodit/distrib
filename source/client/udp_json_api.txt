@@ -1,9 +1,9 @@
-{purpose,text,username(identity of sender),room_name,msg_id}
+{purpose,text,username(identity of sender),room_name,msg_id,timestamp}
 purposes:"incoming_msg","send_old_msg",
             "send_curr_last","reply_curr_last"
 
 total:
 {purpose,text,username(identity of sender),room_name,msg_id,priority,
-    proposer_id}
+    proposer_id,timestamp}
 purposes:"ask_vote","vote","final_sending",
     "final_received_confirm"
