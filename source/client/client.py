@@ -912,7 +912,6 @@ def initialize():
     else:
         StateHolder.room_type = roomFIFO
             
-
     # StateHolder.server_ip = '0.0.0.0:5000'
     # StateHolder.udp_listen_port = 5001 if len(sys.argv) < 2 else int(sys.argv[1])
     OutputHandler.initialize()
@@ -926,6 +925,7 @@ def initialize():
         CommandHandler.pushCommand("!register {}".format(arg_dict["register"]))
     if "room" in arg_dict:
         CommandHandler.pushCommand("!j "+arg_dict["room"])
+        CommandHandler.pushCommand("!w "+arg_dict["room"])
     # time.sleep(1)
     # CommandHandler.pushCommand("!register {}".format(arg_dict["register"]))
 
