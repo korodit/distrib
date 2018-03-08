@@ -602,7 +602,7 @@ class roomTotal:
             msg = self.incoming_msg_q.get()
             if self.exit:break
             purp = msg["purpose"]
-
+            # self.pending_per_member = {"orestarod":{1:"Some text 1",2:"Some text 2"} , "airmper":{1:"airmper text 1",2:"airmper text 2"}}
             # Pool elements:
             # (sender username, msg id):(priority_num,deliverable,prop_id)
 
@@ -687,7 +687,7 @@ class roomTotal:
                 with self.working_set_lock:
                     for member in self.working_set:
                         if (self.working_set[member].vote[0]>max_priority) or ((self.working_set[member].vote[0]==max_priority) and (self.working_set[member].vote[1]<min_id)):
-                            min_priority,min_id = self.working_set[member].vote
+                            max_priority,min_id = self.working_set[member].vote
             found = 1
             while (not self.exit) and found > 0:
                 with self.working_set_lock:
