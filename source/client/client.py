@@ -1,6 +1,6 @@
 import sys
 from string import printable
-from threading import Thread, Lock
+from threading import Thread, Lock,Timer
 import time
 import queue
 import http.client
@@ -168,7 +168,10 @@ class OutputHandler:
 
     @classmethod
     def print_msg(cls,out,timee):
-        cls.print(out+" --Timestamp::"+str(timee))
+        cls.print(out)
+        curr_timestamp = time.time()
+        lat = curr_timestamp - timee
+        Benchmark.add_msg(lat,curr_timestamp)
 
     @classmethod
     def initialize(cls):
@@ -467,7 +470,7 @@ class roomFIFO:
         def swell_balls(self,message,shared_sign): # send a message repeatedely until the parent thread signals off
             while shared_sign[0]:
                 UDPbroker.sendUDP(message)
-                time.sleep(0.01)
+                time.sleep(0.001)
         
         def exit_member(self):
             self.exit = True
@@ -690,7 +693,7 @@ class roomTotal:
                         if not self.working_set[member].vote:
                             found+=1
                             UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
-                time.sleep(0.01)
+                time.sleep(0.001)
             max_priority = -1
             min_id = -1
 
@@ -714,7 +717,7 @@ class roomTotal:
                             out_msg["priority"] = max_priority
                             out_msg["proposer_id"] = min_id
                             UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
-                time.sleep(0.01)
+                time.sleep(0.001)
             
 
 
@@ -891,6 +894,7 @@ class UDPbroker:
     def sendUDP(cls,element):
         """Push element of shape (ip,port,message) to UDP output queue"""
         cls.out_queue.put(element)
+        Benchmark.add_udp()
             
     @classmethod
     def initialize(cls):
@@ -899,6 +903,53 @@ class UDPbroker:
         Thread(target=cls.process_in_queue, name=None, args=(),daemon=True).start()
         # cls.out_queue.put(("0.0.0.0",5001,"Lulz I mssaged myself"))
         Thread(target=cls.process_out_queue, name=None, args=(),daemon=True).start()
+
+class Benchmark:
+    bench_start = 0.0
+    bench_end = 0.0
+    udp_msgs = 0
+    udp_lock = Lock()
+    msg_lock = Lock()
+    txt_msg_num = 0
+    total_latency = 0.0
+    msg_file = ""
+    room_type = ""
+    bench_name= "some_benchmark"
+
+    @classmethod
+    def add_udp(cls):
+        with cls.udp_lock:
+            cls.udp_msgs+=1
+    
+    @classmethod
+    def add_msg(cls,lat,end):
+        with cls.msg_lock:
+            cls.txt_msg_num+=1
+            cls.total_latency+=lat
+            cls.bench_end = max(end,cls.bench_end)
+    
+    @classmethod
+    def schedule_benchmark(cls):
+        waittime = cls.bench_start - time.time()
+        if waittime>=0:
+            Timer(waittime,cls.feed_chat).start()
+    
+    @classmethod
+    def feed_chat(cls):
+        msg_list = []
+        if cls.msg_file != "":
+            with open(cls.msg_file) as f:
+                msg_list = f.readlines()
+            for msg in msg_list:
+                msg = msg.replace("\n","")
+                CommandHandler.pushCommand(msg)
+        time.sleep(10)
+        with open("benchmarks/{}_{}_{}.txt".format(StateHolder.name,Benchmark.room_type,Benchmark.bench_name),"w") as f:
+            f.write("Throughput: {}\n".format(cls.txt_msg_num/(cls.bench_end-cls.bench_start)))
+            f.write("Mean Latency: {}\n".format(cls.total_latency/cls.txt_msg_num))
+            f.write("UDP messages: {}\n".format(cls.udp_msgs))
+
+
 
 def initialize():
     """Do all necessary actions before input loop starts"""
@@ -918,11 +969,33 @@ def initialize():
     if "mode" in arg_dict:
         if arg_dict["mode"] == "total":
             StateHolder.room_type = roomTotal
+            Benchmark.room_type = "total"
         else: # arg_dict["mode"] == "fifo":
             StateHolder.room_type = roomFIFO
+            Benchmark.room_type = "fifo"
     else:
         StateHolder.room_type = roomFIFO
-            
+        Benchmark.room_type = "fifo"
+    
+    if "msgfile" in arg_dict:
+        Benchmark.msg_file = arg_dict["msgfile"]
+    
+    if "benchname" in arg_dict:
+        Benchmark.bench_name = arg_dict["benchname"]
+
+    if "start" in arg_dict:
+        isfloat = False
+        try:
+            float(arg_dict["start"])
+            isfloat = True
+        except ValueError:
+            pass
+        
+        if isfloat:
+            Benchmark.bench_start = float(arg_dict["start"])
+            Benchmark.schedule_benchmark()
+
+
     # StateHolder.server_ip = '0.0.0.0:5000'
     # StateHolder.udp_listen_port = 5001 if len(sys.argv) < 2 else int(sys.argv[1])
     OutputHandler.initialize()

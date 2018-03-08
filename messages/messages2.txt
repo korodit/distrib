@@ -1,0 +1,10 @@
+1b O Deep Thought computer
+2b We want you to tell us...The Answer
+3b The Answer to what?
+4b Life!
+5b The Universe!
+6b Everything!
+7b Tricky
+8b But can you do it?
+9b Yes
+10b There is an answer?
