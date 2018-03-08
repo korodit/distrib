@@ -1,7 +1,11 @@
 # coding: utf-8
 import logic
+import logging
 from flask import Flask,url_for,request
 app = Flask(__name__)
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 @app.route('/')
 def hello_world():

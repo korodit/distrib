@@ -25,8 +25,8 @@ def register(ip,port,username):
                     users[username] = {"id":id,"ip":ip,"port":port,"username":username}
                     id_heartbeat_dict[id] = True
                     id += 1
-                    print "What I got is:",ip,str(port),username
-                    print "This is my heartbeat now:",id_heartbeat_dict
+                    # print "What I got is:",ip,str(port),username
+                    # print "This is my heartbeat now:",id_heartbeat_dict
                     return json.dumps(users[username])
                 else:
                     return json.dumps({"Error":"username already exists"})
