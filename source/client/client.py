@@ -943,7 +943,7 @@ class Benchmark:
             for msg in msg_list:
                 msg = msg.replace("\n","")
                 CommandHandler.pushCommand(msg)
-        time.sleep(10)
+        time.sleep(5)
         with open("benchmarks/{}_{}_{}.txt".format(StateHolder.name,Benchmark.room_type,Benchmark.bench_name),"w") as f:
             f.write("Throughput: {}\n".format(cls.txt_msg_num/(cls.bench_end-cls.bench_start)))
             f.write("Mean Latency: {}\n".format(cls.total_latency/cls.txt_msg_num))
