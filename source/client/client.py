@@ -1,4 +1,5 @@
 import sys
+import os
 from string import printable
 from threading import Thread, Lock,Timer
 import time
@@ -45,7 +46,9 @@ class _GetchWindows:
 # enter: ord 13
 #backspace: ord 127
 
-getch = _Getch()
+# getch = _Getch()
+# getch = lamba : time.sleep(1)
+getch = None
 
 def server_request(parameters):
     """Returns a proper object out of a request to the tracker"""
@@ -944,16 +947,21 @@ class Benchmark:
                 msg = msg.replace("\n","")
                 CommandHandler.pushCommand(msg)
         time.sleep(5)
-        with open("benchmarks/{}_{}_{}.txt".format(StateHolder.name,Benchmark.room_type,Benchmark.bench_name),"w") as f:
-            f.write("Throughput: {}\n".format(cls.txt_msg_num/(cls.bench_end-cls.bench_start)))
-            f.write("Mean Latency: {}\n".format(cls.total_latency/cls.txt_msg_num))
-            f.write("UDP messages: {}\n".format(cls.udp_msgs))
+        f = open("benchmarks/{}_{}_{}.txt".format(StateHolder.name,Benchmark.room_type,Benchmark.bench_name),"w")
+        f.write("Throughput: {}\n".format(cls.txt_msg_num/(cls.bench_end-cls.bench_start)))
+        f.write("Mean Latency: {}\n".format(cls.total_latency/cls.txt_msg_num))
+        f.write("UDP messages: {}\n".format(cls.udp_msgs))
+        f.close()
+
+        # f = open("bench_outputs/{}_{}_{}.txt".format(StateHolder.name,Benchmark.room_type,Benchmark.bench_name),"w")
+
+        os._exit(0)
 
 
 
 def initialize():
     """Do all necessary actions before input loop starts"""
-
+    isbench = False
     # udp,register,server,room
     arg_dict = get_args()
     if "udp" in arg_dict and arg_dict["udp"].isdigit():
@@ -984,6 +992,7 @@ def initialize():
         Benchmark.bench_name = arg_dict["benchname"]
 
     if "start" in arg_dict:
+        isbench = True
         isfloat = False
         try:
             float(arg_dict["start"])
@@ -994,7 +1003,6 @@ def initialize():
         if isfloat:
             Benchmark.bench_start = float(arg_dict["start"])
             Benchmark.schedule_benchmark()
-
 
     # StateHolder.server_ip = '0.0.0.0:5000'
     # StateHolder.udp_listen_port = 5001 if len(sys.argv) < 2 else int(sys.argv[1])
@@ -1013,16 +1021,22 @@ def initialize():
     # time.sleep(1)
     # CommandHandler.pushCommand("!register {}".format(arg_dict["register"]))
 
+    return isbench
+
 def get_args():
     arg_pairs = list(map(lambda x:x.split("="),[x for x in sys.argv[1:] if x.count("=") == 1]))
     arg_dict = {}
     for par in arg_pairs:
         arg_dict[par[0]] = par[1]
     return arg_dict
-
+        
 if __name__ == "__main__":
-    initialize()
-    while(True):
-        # pass
-        ch=getch()
-        InputHandler.handle_input(ch)
+    isbench = initialize()
+    if not isbench:
+        getch = _Getch()
+        while(True):
+            # pass
+            ch=getch()
+            InputHandler.handle_input(ch)
+    else:
+        pass
