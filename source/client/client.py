@@ -174,7 +174,7 @@ class OutputHandler:
         cls.print(out)
         curr_timestamp = time.time()
         lat = curr_timestamp - timee
-        Benchmark.add_msg(lat,curr_timestamp)
+        Benchmark.add_msg(lat,curr_timestamp,out)
 
     @classmethod
     def initialize(cls):
@@ -918,6 +918,7 @@ class Benchmark:
     msg_file = ""
     room_type = ""
     bench_name= "some_benchmark"
+    printed_messages = []
 
     @classmethod
     def add_udp(cls):
@@ -925,17 +926,20 @@ class Benchmark:
             cls.udp_msgs+=1
     
     @classmethod
-    def add_msg(cls,lat,end):
+    def add_msg(cls,lat,end,out):
         with cls.msg_lock:
             cls.txt_msg_num+=1
             cls.total_latency+=lat
             cls.bench_end = max(end,cls.bench_end)
+            cls.printed_messages.append(out)
     
     @classmethod
     def schedule_benchmark(cls):
         waittime = cls.bench_start - time.time()
         if waittime>=0:
             Timer(waittime,cls.feed_chat).start()
+        else:
+            os._exit(0)
     
     @classmethod
     def feed_chat(cls):
@@ -947,13 +951,26 @@ class Benchmark:
                 msg = msg.replace("\n","")
                 CommandHandler.pushCommand(msg)
         time.sleep(5)
-        f = open("benchmarks/{}_{}_{}.txt".format(StateHolder.name,Benchmark.room_type,Benchmark.bench_name),"w")
+        try:
+            os.makedirs("benchmarks/{}/{}".format(Benchmark.bench_name,Benchmark.room_type))
+        except OSError:
+            pass
+
+        f = open("benchmarks/{}/{}/{}_{}_{}.txt".format(Benchmark.bench_name,Benchmark.room_type,StateHolder.name,Benchmark.room_type,Benchmark.bench_name),"w")
         f.write("Throughput: {}\n".format(cls.txt_msg_num/(cls.bench_end-cls.bench_start)))
         f.write("Mean Latency: {}\n".format(cls.total_latency/cls.txt_msg_num))
         f.write("UDP messages: {}\n".format(cls.udp_msgs))
         f.close()
 
-        # f = open("bench_outputs/{}_{}_{}.txt".format(StateHolder.name,Benchmark.room_type,Benchmark.bench_name),"w")
+        try:
+            os.makedirs("bench_outputs/{}/{}".format(Benchmark.bench_name,Benchmark.room_type))
+        except OSError:
+            pass
+
+        f = open("bench_outputs/{}/{}/{}_{}_{}.txt".format(Benchmark.bench_name,Benchmark.room_type,StateHolder.name,Benchmark.room_type,Benchmark.bench_name),"w")
+        for msg in cls.printed_messages:
+            f.write(msg+"\n")
+        f.close()
 
         os._exit(0)
 
