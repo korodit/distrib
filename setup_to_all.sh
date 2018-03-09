@@ -1,0 +1,5 @@
+ssh distrib-1 "bash /home/distrib04/distrib/setupenv.sh"
+ssh distrib-2 "bash /home/distrib04/distrib/setupenv.sh"
+ssh distrib-3 "bash /home/distrib04/distrib/setupenv.sh"
+ssh distrib-4 "bash /home/distrib04/distrib/setupenv.sh"
+ssh distrib-5 "bash /home/distrib04/distrib/setupenv.sh"
