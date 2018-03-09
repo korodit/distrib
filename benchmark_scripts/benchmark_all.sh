@@ -1,0 +1,10 @@
+bash benchmark1fifo.sh
+bash benchmark1total.sh
+bash benchmark2fifo.sh
+bash benchmark2total.sh
+bash benchmark4fifo.sh
+bash benchmark4total.sh
+bash benchmark8fifo.sh
+bash benchmark8total.sh
+bash benchmark16fifo.sh
+bash benchmark16total.sh
