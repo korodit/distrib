@@ -1,10 +1,19 @@
-bash benchmark1fifo.sh
-bash benchmark1total.sh
-bash benchmark2fifo.sh
-bash benchmark2total.sh
-bash benchmark4fifo.sh
-bash benchmark4total.sh
-bash benchmark8fifo.sh
-bash benchmark8total.sh
-bash benchmark16fifo.sh
+bash benchmark1fifo.sh &&
+sleep 1s &&
+bash benchmark1total.sh &&
+sleep 1s &&
+bash benchmark2fifo.sh &&
+sleep 1s &&
+bash benchmark2total.sh &&
+sleep 1s &&
+bash benchmark4fifo.sh &&
+sleep 1s &&
+bash benchmark4total.sh &&
+sleep 1s &&
+bash benchmark8fifo.sh &&
+sleep 1s &&
+bash benchmark8total.sh &&
+sleep 1s &&
+bash benchmark16fifo.sh &&
+sleep 1s &&
 bash benchmark16total.sh

@@ -1,0 +1,5 @@
+ssh distrib-1 "rm -rf distrib"
+ssh distrib-2 "rm -rf distrib"
+ssh distrib-3 "rm -rf distrib"
+ssh distrib-4 "rm -rf distrib"
+ssh distrib-5 "rm -rf distrib"

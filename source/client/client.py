@@ -10,9 +10,10 @@ import socket
 from pqdict import pqdict
 import copy
 
-resend_interval = 0.01
+spam_interval = 0.01
 update_members_interval = 0.3
 heartbeat_interval = 0.3
+total_interval = 0.001
 
 class _Getch:
     """Gets a single character from standard input.  Does not echo to the
@@ -477,7 +478,7 @@ class roomFIFO:
         def spam(self,message,shared_sign): # send a message repeatedely until the parent thread signals off
             while shared_sign[0]:
                 UDPbroker.sendUDP(message)
-                time.sleep(resend_interval)
+                time.sleep(spam_interval)
         
         def exit_member(self):
             self.exit = True
@@ -700,7 +701,7 @@ class roomTotal:
                         if not self.working_set[member].vote:
                             found+=1
                             UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
-                time.sleep(resend_interval)
+                time.sleep(total_interval)
             max_priority = -1
             min_id = -1
 
@@ -724,7 +725,7 @@ class roomTotal:
                             out_msg["priority"] = max_priority
                             out_msg["proposer_id"] = min_id
                             UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
-                time.sleep(resend_interval)
+                time.sleep(total_interval)
             
 
 
