@@ -10,7 +10,7 @@ import socket
 from pqdict import pqdict
 import copy
 
-spam_interval = 0.01
+spam_interval = 0.001
 update_members_interval = 0.3
 heartbeat_interval = 0.3
 total_interval = 0.001
