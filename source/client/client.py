@@ -10,6 +10,10 @@ import socket
 from pqdict import pqdict
 import copy
 
+resend_interval = 0.01
+update_members_interval = 0.3
+heartbeat_interval = 0.3
+
 class _Getch:
     """Gets a single character from standard input.  Does not echo to the
     screen."""
@@ -426,7 +430,7 @@ class roomFIFO:
             message = {"purpose":"send_curr_last","username":StateHolder.name,"room_name":self.room_name}
             message = (self.ip,self.port,json.dumps(message))
             shared_sign = [True]
-            Thread(target=self.swell_balls, name=None, args=(message,shared_sign),daemon=True).start()
+            Thread(target=self.spam, name=None, args=(message,shared_sign),daemon=True).start()
             while True:
                 msg = self.msg_queue.get()
                 if msg["purpose"]!="reply_curr_last":
@@ -449,7 +453,7 @@ class roomFIFO:
                             message = {"purpose":"send_old_msg","username":StateHolder.name,"room_name":self.room_name,"msg_id":(self.last_received + 1)}
                             message = (self.ip,self.port,json.dumps(message))
                             shared_sign = [True]
-                            Thread(target=self.swell_balls, name=None, args=(message,shared_sign),daemon=True).start()
+                            Thread(target=self.spam, name=None, args=(message,shared_sign),daemon=True).start()
                             self.process_mode = "inq"
                     except queue.Empty:
                         self.process_mode = "inq"
@@ -470,10 +474,10 @@ class roomFIFO:
                                 shared_sign = [False]
                             self.process_mode = "prq"
 
-        def swell_balls(self,message,shared_sign): # send a message repeatedely until the parent thread signals off
+        def spam(self,message,shared_sign): # send a message repeatedely until the parent thread signals off
             while shared_sign[0]:
                 UDPbroker.sendUDP(message)
-                time.sleep(0.001)
+                time.sleep(resend_interval)
         
         def exit_member(self):
             self.exit = True
@@ -506,7 +510,7 @@ class roomFIFO:
                 for member in response:
                     if member["username"] not in self.members:
                         self.members[member["username"]] = self.member_struct(self.room_name,member)
-            time.sleep(0.3)
+            time.sleep(update_members_interval)
         with self.members_lock:
             for member in self.members:
                 self.members[member].exit_member()
@@ -696,7 +700,7 @@ class roomTotal:
                         if not self.working_set[member].vote:
                             found+=1
                             UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
-                time.sleep(0.001)
+                time.sleep(resend_interval)
             max_priority = -1
             min_id = -1
 
@@ -720,7 +724,7 @@ class roomTotal:
                             out_msg["priority"] = max_priority
                             out_msg["proposer_id"] = min_id
                             UDPbroker.sendUDP((self.working_set[member].ip,self.working_set[member].port,json.dumps(out_msg)))
-                time.sleep(0.001)
+                time.sleep(resend_interval)
             
 
 
@@ -753,7 +757,7 @@ class roomTotal:
                         if member["username"] not in self.members:
                             self.members[member["username"]] = self.member_struct(member)
                             self.pending_per_member[member["username"]]={}
-            time.sleep(0.3)
+            time.sleep(update_members_interval)
 
 
 
@@ -846,7 +850,7 @@ class StateHolder:
         # OutputHandler.print("This is my flag list"+str(flag_list))
         while (flag[0]):
             server_request("/heartbeat/{}".format(cls.id))
-            time.sleep(0.3)
+            time.sleep(heartbeat_interval)
 
     @classmethod
     def stop_heartbeat(cls):
